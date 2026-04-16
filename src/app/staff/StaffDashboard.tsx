@@ -101,11 +101,9 @@ export function StaffDashboard() {
   );
   const pinBootstrapRef = useRef<string | null>(pinFromUrl);
 
-  const displayOrders = useMemo(() => [...orders].reverse(), [orders]);
-
   const visibleOrders = useMemo(
-    () => filterOrdersForTab(displayOrders, filter),
-    [displayOrders, filter],
+    () => filterOrdersForTab(orders, filter),
+    [orders, filter],
   );
 
   const addHighlights = useCallback((newIds: string[]) => {

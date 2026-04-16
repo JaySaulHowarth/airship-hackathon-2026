@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const docs = await db
       .collection(ORDERS_COLLECTION)
       .find({}, { projection: { _id: 0 } })
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 })
       .toArray();
 
     const orders = [];

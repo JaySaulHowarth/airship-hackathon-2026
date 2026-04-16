@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const ORDER_POLL_MS = 8000;
+const MENU_POLL_MS = 8000;
 
 function orderFromCreateResponse(r: CreateOrderResponse): Order {
   return {
@@ -41,6 +42,7 @@ type GuestOrderFlowProps = {
 export function GuestOrderFlow({ table }: GuestOrderFlowProps) {
   const [items, setItems] = useState<MenuItem[] | null>(null);
   const [menuError, setMenuError] = useState<string | null>(null);
+  const [menuPollError, setMenuPollError] = useState<string | null>(null);
   const [cart, setCart] = useState<Cart>({});
   const [note, setNote] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -50,8 +52,11 @@ export function GuestOrderFlow({ table }: GuestOrderFlowProps) {
   const [pollError, setPollError] = useState<string | null>(null);
   const [statusRefreshing, setStatusRefreshing] = useState(false);
 
-  const loadMenu = useCallback(async () => {
-    setMenuError(null);
+  const loadMenu = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    if (!silent) {
+      setMenuError(null);
+    }
     try {
       const res = await fetch("/api/menu");
       const json: unknown = await res.json().catch(() => null);
@@ -63,18 +68,49 @@ export function GuestOrderFlow({ table }: GuestOrderFlowProps) {
           typeof (json as { error: unknown }).error === "string"
             ? (json as { error: string }).error
             : `Could not load menu (${res.status})`;
+        if (silent) {
+          setMenuPollError(msg);
+          return;
+        }
         setMenuError(msg);
         setItems(null);
         return;
       }
       const parsed = getMenuResponseSchema.safeParse(json);
       if (!parsed.success) {
+        if (silent) {
+          setMenuPollError("Menu data was invalid. Try refresh.");
+          return;
+        }
         setMenuError("Menu data was invalid. Please refresh.");
         setItems(null);
         return;
       }
-      setItems(parsed.data.items);
+      const nextItems = parsed.data.items;
+      setItems(nextItems);
+      setMenuPollError(null);
+      setMenuError(null);
+      setCart((prev) => {
+        const purchasable = new Set(
+          nextItems
+            .filter((i) => i.available !== false)
+            .map((i) => i.id),
+        );
+        const next = { ...prev };
+        let changed = false;
+        for (const id of Object.keys(next)) {
+          if (!purchasable.has(id)) {
+            delete next[id];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     } catch {
+      if (silent) {
+        setMenuPollError("Could not refresh menu. Check your connection.");
+        return;
+      }
       setMenuError("Network error loading menu. Check your connection.");
       setItems(null);
     }
@@ -83,6 +119,12 @@ export function GuestOrderFlow({ table }: GuestOrderFlowProps) {
   useEffect(() => {
     void loadMenu();
   }, [loadMenu]);
+
+  useEffect(() => {
+    if (success) return;
+    const id = window.setInterval(() => void loadMenu({ silent: true }), MENU_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [success, loadMenu]);
 
   const itemById = useMemo(() => {
     const m = new Map<string, MenuItem>();
@@ -337,6 +379,15 @@ export function GuestOrderFlow({ table }: GuestOrderFlowProps) {
             >
               Try again
             </button>
+          </div>
+        ) : null}
+
+        {menuPollError && !menuError ? (
+          <div
+            className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-950"
+            role="status"
+          >
+            {menuPollError}
           </div>
         ) : null}
 

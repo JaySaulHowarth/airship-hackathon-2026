@@ -66,6 +66,7 @@ export const createOrderResponseSchema = z.object({
   table: z.number().int(),
   createdAt: z.string().datetime({ offset: true }),
   lines: z.array(orderLineSnapshotSchema).min(1),
+  status: orderStatusSchema,
   note: z.string().max(ORDER_NOTE_MAX_LENGTH).optional(),
 });
 

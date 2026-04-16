@@ -1,0 +1,23 @@
+{
+    "id": "00000000-0000-4000-8000-000000000001",
+    "table": 12,
+    "createdAt": { "$date": "2026-04-16T14:30:00.000Z" },
+    "status": "new",
+    "note": "No onions please",
+    "lines": [
+      {
+        "menuItemId": "item-cheeseburger",
+        "qty": 2,
+        "name": "Cheeseburger",
+        "price": 1250,
+        "kind": "food"
+      },
+      {
+        "menuItemId": "item-lager",
+        "qty": 1,
+        "name": "House lager",
+        "price": 550,
+        "kind": "drink"
+      }
+    ]
+  }

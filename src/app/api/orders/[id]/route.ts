@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { orderStatusSchema } from "@/lib/contracts/schemas";
+import { TABLE_NUMBER_MAX, TABLE_NUMBER_MIN } from "@/lib/contracts/constants";
+import { orderSchema, orderStatusSchema } from "@/lib/contracts/schemas";
 import { getDb, ORDERS_COLLECTION } from "@/lib/db";
 import {
   hasStaffPinConfigured,
@@ -24,6 +25,67 @@ function nextAllowedStatuses(current: OrderStatus | undefined): OrderStatus[] {
       return [];
     default:
       return [];
+  }
+}
+
+function parseTableQuery(searchParams: URLSearchParams): number | null {
+  const raw = searchParams.get("table");
+  if (raw === null) return null;
+  const s = raw.trim();
+  if (!/^\d+$/.test(s)) return null;
+  const n = Number(s);
+  if (
+    !Number.isInteger(n) ||
+    n < TABLE_NUMBER_MIN ||
+    n > TABLE_NUMBER_MAX
+  ) {
+    return null;
+  }
+  return n;
+}
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+  const tableParam = parseTableQuery(new URL(request.url).searchParams);
+  if (tableParam === null) {
+    return NextResponse.json(
+      { error: "Missing or invalid table query" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const db = await getDb();
+    const doc = await db
+      .collection(ORDERS_COLLECTION)
+      .findOne({ id }, { projection: { _id: 0 } });
+
+    if (!doc || doc.table !== tableParam) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const normalized = {
+      ...doc,
+      createdAt:
+        doc.createdAt instanceof Date
+          ? doc.createdAt.toISOString()
+          : String(doc.createdAt),
+    };
+    const parsed = orderSchema.safeParse(normalized);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(parsed.data);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    if (message.includes("MONGODB_URI")) {
+      return NextResponse.json({ error: message }, { status: 503 });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

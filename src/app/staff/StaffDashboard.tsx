@@ -11,6 +11,7 @@ import type {
   OrderStatus,
 } from "@/lib/contracts/types";
 import { formatPenceGBP } from "@/lib/format-money";
+import { OrderStatusBadge, effectiveOrderStatus } from "@/lib/order-status";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -658,7 +659,7 @@ function OrderCard({
   onPatchStatus,
   statusBusy,
 }: OrderCardProps) {
-  const status: OrderStatus = order.status ?? "new";
+  const status: OrderStatus = effectiveOrderStatus(order.status);
   const nextActions = nextAllowedStatuses(order.status);
 
   const linesBlock =
@@ -708,7 +709,7 @@ function OrderCard({
           <p className="mt-1 font-mono text-xs text-neutral-400" title="Order id">
             {order.id.slice(0, 8)}…
           </p>
-          <StatusBadge status={status} />
+          <OrderStatusBadge status={status} variant="staff" className="mt-2" />
         </div>
       </div>
 
@@ -755,26 +756,6 @@ function OrderCard({
         </div>
       ) : null}
     </article>
-  );
-}
-
-function StatusBadge({ status }: { status: OrderStatus }) {
-  const styles: Record<OrderStatus, string> = {
-    new: "bg-sky-100 text-sky-900",
-    in_progress: "bg-amber-100 text-amber-900",
-    completed: "bg-neutral-200 text-neutral-700",
-  };
-  const label: Record<OrderStatus, string> = {
-    new: "New",
-    in_progress: "In progress",
-    completed: "Done",
-  };
-  return (
-    <span
-      className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}
-    >
-      {label[status]}
-    </span>
   );
 }
 

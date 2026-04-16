@@ -137,6 +137,7 @@ export async function POST(request: Request) {
       table: body.table,
       createdAt: createdAt.toISOString(),
       lines: snapshots,
+      status: "new",
       ...(body.note !== undefined ? { note: body.note } : {}),
     });
 

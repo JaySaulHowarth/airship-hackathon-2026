@@ -11,8 +11,8 @@ This document explains **what** we propose to use and **why** each choice fits t
 | Application framework | **Next.js** (App Router) | Web UI + HTTP API in one deployable unit |
 | Language | **TypeScript** | Shared types for API, menu, orders, filters |
 | Styling | **Tailwind CSS** | Fast, consistent mobile vs laptop layouts |
-| Persistence | **SQLite** (+ thin ORM or raw SQL) | Durable orders and seeded menu |
-| Data access (optional) | **Drizzle ORM** | Type-safe schema and migrations without heavy codegen |
+| Persistence | **MongoDB** | Durable orders and seeded menu (documents + collections) |
+| Data access | **`mongodb` Node driver** (+ **Zod** for request/response shapes) | Typed inserts/queries from Route Handlers without SQL migrations |
 | Updates to staff | **HTTP short polling** + manual refresh | New orders without WebSocket complexity |
 | Staff access control | **Env secret + PIN query or cookie** | Non-guessable staff surface for demos |
 | Local / phone testing | **Same-origin API** (Next Route Handlers) | Fewer CORS and LAN URL issues |
@@ -61,31 +61,32 @@ This document explains **what** we propose to use and **why** each choice fits t
 
 ---
 
-## 5. SQLite
+## 5. MongoDB
 
-**Purpose:** Durable storage for **menu** (seeded) and **orders + lines** so restarts and multiple tabs do not lose demo data.
+**Purpose:** Durable storage for **menu** (seeded) and **orders** so restarts and multiple tabs do not lose demo data.
 
 **Why it suits this project**
 
-- **PRD:** Explicit requirement to **persist orders** for staff visibility — a **file-backed** DB is trivial to reset, copy, and run locally ([PRD §5.1](./PRD.md)).
-- **PRD:** Single-venue, single menu — no need for multi-tenant scaling or a managed cluster ([PRD §3](./PRD.md)).
-- **PRD pitfalls:** Avoid “cart only in localStorage” — SQLite is the straightforward server-side answer ([PRD §9](./PRD.md)).
-- **Judging:** One binary + schema file; works offline on event Wi-Fi once the server is up.
+- **PRD:** Explicit requirement to **persist orders** for staff visibility — MongoDB is a straightforward **server-side** store; avoid “cart only in localStorage” ([PRD §5.1](./PRD.md), [PRD §9](./PRD.md)).
+- **PRD:** Single-venue, single menu — model as simple **collections** (e.g. `menu_items`, `orders`) without multi-tenant complexity ([PRD §3](./PRD.md)).
+- **Document fit:** One **order** document can embed a **`lines`** array (each line: menu reference id plus **snapshot** fields `name`, `price` (integer **pence**, UK), `kind`) so staff views stay stable without SQL joins ([PRD §5.1](./PRD.md), [PRD §9](./PRD.md)).
+- **Hackathon ops:** Use **`MONGODB_URI`** in env — either **local `mongod` / Docker** (works on flaky Wi-Fi once running) or **MongoDB Atlas** (budget a few minutes for URI + IP allowlist if judges use LAN).
 
-**Tradeoff:** Not ideal for massive concurrent writes; acceptable for a bar MVP demo and a single small server process.
+**Tradeoff:** Adds a **running database** (or cloud dependency for Atlas) versus a single SQLite file; team should script **seed** + optional **reset** so demos stay reproducible.
 
 ---
 
-## 6. Drizzle ORM (optional but recommended)
+## 6. Data access: driver + validation (no Drizzle)
 
-**Purpose:** Define **schema** (`menu_items`, `orders`, `order_lines`) and run type-safe queries from Route Handlers.
+**Purpose:** Connect from Next **Route Handlers** with the official **`mongodb`** package; keep **Zod** (or shared TS types) aligned with API bodies and stored document shapes.
 
 **Why it suits this project**
 
-- Maps cleanly to relational data: **orders** with **many lines**, each line referencing `menu_item_id` plus **snapshot** fields (`name`, `priceCents`, `kind`) for stable staff display ([PRD §5.1](./PRD.md), [PRD §9](./PRD.md)).
-- Lightweight compared to heavy ORM codegen pipelines — fits a **3-hour** window.
+- **Orders:** `insertOne` / `find` on `orders` with embedded `lines`; index e.g. `createdAt` for staff queue ordering.
+- **Menu:** Seed `menu_items` once (script or startup idempotent upsert); `GET /menu` reads from the collection.
+- Fits a **3-hour** window: no relational migration pipeline; optional **Mongoose** only if the team moves faster with schemas than with driver + Zod.
 
-**Alternative:** `better-sqlite3` with handwritten SQL — fewer dependencies, slightly more manual work.
+**Alternative:** **Prisma** with the MongoDB connector — schema in one place; slightly more setup than the raw driver.
 
 ---
 
@@ -134,7 +135,7 @@ This document explains **what** we propose to use and **why** each choice fits t
 | Technology | Reason to skip (for 3 hours) |
 |------------|------------------------------|
 | **Payment SDKs** | Out of scope ([PRD §2](./PRD.md)). |
-| **PostgreSQL / hosted DB** | SQLite suffices; avoids provisioning and cold starts ([PRD §9](./PRD.md)). |
+| **SQLite / file-backed SQL** | MongoDB is the chosen store; document model matches embedded order lines ([PRD §5.1](./PRD.md)). |
 | **Redis / message queues** | No distributed workers or peak fan-out requirement for MVP. |
 | **WebSockets / realtime DB first** | Higher debug risk before core demo works ([PRD §9](./PRD.md)). |
 | **Mobile native apps** | PRD requires **no app download** ([PRD §2](./PRD.md)). |
@@ -147,3 +148,5 @@ This document explains **what** we propose to use and **why** each choice fits t
 | Version | Notes |
 |---------|--------|
 | 1.0 | Initial stack rationale tied to PRD v1.1. |
+| 1.1 | Persistence switched from SQLite + optional Drizzle to MongoDB + `mongodb` driver and Zod. |
+| 1.2 | Order line snapshots: `price` in integer pence (UK), aligned with contracts (replacing `priceCents`). |

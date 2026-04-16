@@ -10,7 +10,7 @@ This plan follows the PRD execution order (**contract → staff → guest → po
 ## Guiding principles
 
 1. **Staff pipeline first** — proves persistence, API, and filters before guest polish.
-2. **Server is source of truth** — orders live in SQLite (or chosen store); guest cart is UI state until `POST` succeeds.
+2. **Server is source of truth** — orders live in MongoDB; guest cart is UI state until `POST` succeeds.
 3. **Polling over sockets** — `GET /orders` on an interval + manual refresh until core flows are done.
 4. **Lock decisions early** — Option **A** vs **B** for staff filters ([PRD §5.3](./PRD.md)); default **Option A** (matching lines first, “+N other items”).
 
@@ -22,9 +22,10 @@ This plan follows the PRD execution order (**contract → staff → guest → po
 
 **Deliverables**
 
-- **Menu item:** `id`, `name`, `priceCents`, `kind: "food" | "drink"`, optional `description`; stretch: `available`.
+- **Money (UK):** `price` is an integer in **pence** everywhere (menu and order-line snapshots, e.g. £5.50 → `550`); document once in types/API so formatters stay consistent.
+- **Menu item:** `id`, `name`, `price`, `kind: "food" | "drink"`, optional `description`; stretch: `available`.
 - **Order:** `id`, `table`, `createdAt`, `lines[]`; stretch: `status` (`new` → `in_progress` → `completed`).
-- **Order line:** `menuItemId`, `qty`, plus **snapshot** `name`, `priceCents`, `kind` at submit (stable staff view if menu changes).
+- **Order line:** `menuItemId`, `qty`, plus **snapshot** `name`, `price`, `kind` at submit (stable staff view if menu changes).
 - **Staff filter UX:** Confirm **Option A** (recommended) or **Option B** ([PRD §5.3](./PRD.md)).
 - **Table validation:** If using numeric tables `1..N`, document max `N` and server-side check ([PRD §8](./PRD.md)).
 - **Price lock rule:** Lock at **add-to-cart** or **submit** — pick one ([PRD §8](./PRD.md)).
@@ -35,15 +36,15 @@ This plan follows the PRD execution order (**contract → staff → guest → po
 
 ## Phase 1 — Backend, database, seed (45–60 min)
 
-**Goal:** Menu and orders are readable/writable through HTTP with data on disk.
+**Goal:** Menu and orders are readable/writable through HTTP with data **persisted in a local MongoDB** (e.g. `mongod` or Docker on the same machine; `MONGODB_URI` points at that instance).
 
 **Deliverables**
 
-- **Schema:** `menu_items`, `orders`, `order_lines` (lines store snapshot fields for demo clarity).
+- **Schema:** Collections `menu_items` and `orders`; each order document embeds a `lines` array with snapshot fields for demo clarity.
 - **`GET /api/menu`** — returns seeded menu (single global menu per [PRD §3](./PRD.md)).
 - **`POST /api/orders`** — body: `table`, `lines`, optional `note`; validate non-empty cart, optional table range; **persist**; return `orderId` + echo of payload ([PRD §5.1](./PRD.md)).
 - **`GET /api/orders`** — newest first by server `createdAt`; **protect** with PIN/secret ([PRD §7](./PRD.md), [TECH_STACK §8](./TECH_STACK.md)).
-- **Seed:** SQL or script to insert initial menu with correct `kind` on every item.
+- **Seed:** Script (e.g. `insertMany` / upsert) to load initial menu with correct `kind` on every item.
 
 **Stretch (if time in this phase)**
 
@@ -139,3 +140,4 @@ Use this before calling the build “done” for judging.
 | Version | Notes |
 |---------|--------|
 | 1.0 | Initial high-level plan from hackathon scaffolding. |
+| 1.1 | Phase 0: `price` in integer pence (UK) instead of `priceCents`. |

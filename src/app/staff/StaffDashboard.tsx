@@ -15,7 +15,7 @@ import { OrderStatusBadge, effectiveOrderStatus } from "@/lib/order-status";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type StaffFilter = "all" | "food" | "drink";
+type StaffFilter = "all" | "food" | "drink" | "done";
 
 const POLL_MS = 8000;
 
@@ -24,8 +24,14 @@ function orderHasKind(order: Order, kind: "food" | "drink"): boolean {
 }
 
 function filterOrdersForTab(orders: Order[], filter: StaffFilter): Order[] {
-  if (filter === "all") return orders;
-  return orders.filter((o) => orderHasKind(o, filter));
+  if (filter === "done") {
+    return orders.filter((o) => effectiveOrderStatus(o.status) === "completed");
+  }
+  const active = orders.filter(
+    (o) => effectiveOrderStatus(o.status) !== "completed",
+  );
+  if (filter === "all") return active;
+  return active.filter((o) => orderHasKind(o, filter));
 }
 
 function partitionLines(
@@ -511,6 +517,7 @@ export function StaffDashboard() {
                   ["all", "All"],
                   ["food", "Food"],
                   ["drink", "Drinks"],
+                  ["done", "Done"],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -661,7 +668,7 @@ function OrderCard({
   const nextActions = nextAllowedStatuses(order.status);
 
   const linesBlock =
-    filter === "all" ? (
+    filter === "all" || filter === "done" ? (
       <ul className="mt-2 space-y-1 text-sm">
         {order.lines.map((line, i) => (
           <li key={`${line.menuItemId}-${i}`} className="flex justify-between gap-3">

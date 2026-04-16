@@ -16,6 +16,15 @@ export const menuItemSchema = z.object({
   description: z.string().optional(),
   /** Stretch: menu availability */
   available: z.boolean().optional(),
+  /** Optional photo (absolute URL or same-origin path) */
+  imageUrl: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined) return undefined;
+      const t = String(val).trim();
+      return t.length > 0 ? t : undefined;
+    },
+    z.string().min(1).optional(),
+  ),
 });
 
 export const orderStatusSchema = z.enum(["new", "in_progress", "completed"]);

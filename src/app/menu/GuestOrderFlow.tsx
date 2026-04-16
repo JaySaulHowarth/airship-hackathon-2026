@@ -418,6 +418,22 @@ export function GuestOrderFlow({ table }: GuestOrderFlowProps) {
               }`}
             >
               <div className="flex gap-4">
+                {item.imageUrl ? (
+                  <div
+                    className={`relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-neutral-100 ${
+                      soldOut ? "opacity-60 grayscale" : ""
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- menu URLs are arbitrary (CDN / paths) */}
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <h2 className="text-base font-semibold text-neutral-900">
